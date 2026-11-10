@@ -16,6 +16,9 @@ import { DayStrip } from './DayStrip'
 import { ScheduleSheet, GUIDE_TITLE } from './ScheduleSheet'
 import { MenuSheet } from './MenuSheet'
 import { NoticePopup, noticeVersion } from './NoticePopup'
+import { SurveyReminder } from './SurveyForm'
+import { MyWritingsSheet } from './MyWritingsSheet'
+import { PrintSheet } from './PrintSheet'
 
 function PageView({ page }: { page: Page }) {
   if (page.type === 'day') return <DayCover page={page} />
@@ -33,7 +36,7 @@ export function Viewer({ banner, quiet = false }: { banner?: ReactNode; quiet?: 
   const { d, doc, at, role, scope } = useTrip()
   const [lastPage, setLastPage] = useStored<string | null>(`last-page:${scope}`, null)
   const [mapTall, setMapTall] = useStored<boolean>('map-tall', false)
-  const [sheet, setSheet] = useState<'schedule' | 'menu' | null>(null)
+  const [sheet, setSheet] = useState<'schedule' | 'menu' | 'mine' | 'print' | null>(null)
   const [hidden, setHidden] = useStored<string[]>(`notices-hidden:${scope}`, [])
   const [closedNow, setClosedNow] = useState<string[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -194,8 +197,11 @@ export function Viewer({ banner, quiet = false }: { banner?: ReactNode; quiet?: 
       </nav>
 
       {sheet === 'schedule' ? <ScheduleSheet current={current} nowKey={nowInfo.page?.key ?? null} onJump={jump} onClose={() => setSheet(null)} /> : null}
-      {sheet === 'menu' ? <MenuSheet onJump={jump} onClose={() => setSheet(null)} /> : null}
+      {sheet === 'menu' ? <MenuSheet onJump={jump} onOpen={setSheet} onClose={() => setSheet(null)} /> : null}
+      {sheet === 'mine' ? <MyWritingsSheet onJump={jump} onClose={() => setSheet(null)} /> : null}
+      {sheet === 'print' ? <PrintSheet onClose={() => setSheet(null)} /> : null}
       {sheet === null && pending.length ? <NoticePopup items={pending} onHide={(n) => setHidden((h) => [...h, noticeVersion(n)])} onClose={() => setClosedNow((c) => [...c, ...pending.map(noticeVersion)])} /> : null}
+      <SurveyReminder blocked={sheet !== null || pending.length > 0 || quiet || current.key === 'after'} />
       <span className="sr-only" aria-live="polite">
         {current.chapter.label} {pageTitle(current)}
       </span>

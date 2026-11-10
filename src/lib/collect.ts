@@ -3,12 +3,16 @@
  * 같은 학번 파일이 여럿이면 가장 늦게 저장한 것을 쓴다. 다른 여행 파일은 뺀다.
  */
 import type { Derived, StopPage } from '../trip/derive'
-import { reflectStops } from '../trip/derive'
+import { missionStops, reflectStops } from '../trip/derive'
 import { parseReflectionFile, type FileData } from './reflectionFile'
 import { nameProblem, studentNoProblem } from './reflections'
+import { surveyQuestions, validScore } from './records'
+import type { Mission, TripDoc } from '../trip/schema'
 
-export type Student = { no: string; name: string; savedAt: string; answers: Map<string, string>; file: string; warnings: string[] }
-export type Collected = { students: Student[]; skipped: { file: string; reason: string }[]; questions: StopPage[] }
+export type StudentSurvey = { scores: Map<string, number>; comments: Map<string, string>; done: boolean }
+export type Student = { no: string; name: string; savedAt: string; answers: Map<string, string>; missions: Map<string, string>; survey: StudentSurvey | null; file: string; warnings: string[] }
+export type MissionItem = { mission: Mission; page: StopPage }
+export type Collected = { students: Student[]; skipped: { file: string; reason: string }[]; questions: StopPage[]; missionItems: MissionItem[]; survey: TripDoc['survey'] }
 
 /** 본문으로만 읽은 파일의 글을 일정에 맞춘다(일차 + 장소 이름) */
 function matchStop(d: Derived, item: FileData['items'][number]): StopPage | undefined {
@@ -17,8 +21,19 @@ function matchStop(d: Derived, item: FileData['items'][number]): StopPage | unde
   return qs.find((p) => p.dayN === item.d && (p.stop.place?.name ?? p.stop.title) === item.t)
 }
 
+/** 파일에 적힌 저장 시각. 날짜가 아니거나 미래면(하루 여유) 0 으로 보아, 고쳐 쓴 파일이 진짜 파일을 밀어내지 못하게 한다 */
+function savedTime(value: string): number {
+  const t = Date.parse(value)
+  return Number.isFinite(t) && t <= Date.now() + 86_400_000 ? t : 0
+}
+
 export function collect(d: Derived, tripId: string, files: { name: string; text: string }[]): Collected {
   const questions = reflectStops(d)
+  const missionItems = missionStops(d).flatMap((page) => page.stop.missions!.map((mission) => ({ mission, page })))
+  const missionIds = new Set(missionItems.map((m) => m.mission.id))
+  const surveyIds = new Set(surveyQuestions(d.doc).map((q) => q.id))
+  const commentGroups = new Set(d.doc.survey?.groups.filter((g) => g.comment).map((g) => g.id))
+  const hasExtras = missionItems.length > 0 || surveyIds.size > 0
   const skipped: Collected['skipped'] = []
   const byNo = new Map<string, Student>()
   for (const f of files) {
@@ -43,7 +58,7 @@ export function collect(d: Derived, tripId: string, files: { name: string; text:
       }
       warnings.push(`파일의 여행 제목(「${data.title.trim()}」)이 지금 제목과 달라요. 장소가 맞아서 넣었어요.`)
     }
-    if (r.fromText) warnings.push('맨 아래 정보 줄이 지워져 본문으로 읽었어요.')
+    if (r.fromText) warnings.push(hasExtras ? '맨 아래 정보 줄이 지워져 본문으로 읽었어요. 활동지와 만족도 답은 읽지 못했어요.' : '맨 아래 정보 줄이 지워져 본문으로 읽었어요.')
     const noErr = studentNoProblem(data.no, d.doc.studentIdDigits)
     if (noErr) warnings.push(noErr)
     const nameErr = nameProblem(data.name)
@@ -56,10 +71,25 @@ export function collect(d: Derived, tripId: string, files: { name: string; text:
       else unmatched++
     }
     if (unmatched) warnings.push(`지금 일정에 없는 곳의 글 ${unmatched}개는 넣지 않았어요.`)
-    const s: Student = { no: data.no, name: data.name.trim(), savedAt: data.savedAt, answers, file: f.name, warnings }
+    const missions = new Map<string, string>()
+    let lostMissions = 0
+    for (const m of data.missions ?? []) {
+      if (missionIds.has(m.id)) missions.set(m.id, m.a)
+      else lostMissions++
+    }
+    if (lostMissions) warnings.push(`지금 일정에 없는 활동지 답 ${lostMissions}개는 넣지 않았어요.`)
+    const survey: StudentSurvey | null = data.survey
+      ? {
+          scores: new Map(Object.entries(data.survey.scores).filter(([id, v]) => surveyIds.has(id) && validScore(v))),
+          comments: new Map(Object.entries(data.survey.comments).filter(([id, v]) => commentGroups.has(id) && v.trim())),
+          done: data.survey.done,
+        }
+      : null
+    if (data.savedAt && !savedTime(data.savedAt)) warnings.push('저장한 때가 올바르지 않아요. 같은 학번 파일이 있으면 이 파일은 뒤로 밀려요.')
+    const s: Student = { no: data.no, name: data.name.trim(), savedAt: data.savedAt, answers, missions, survey, file: f.name, warnings }
     const prev = byNo.get(s.no)
     if (prev) {
-      const keepNew = (s.savedAt || '') >= (prev.savedAt || '')
+      const keepNew = savedTime(s.savedAt) >= savedTime(prev.savedAt)
       const kept = keepNew ? s : prev
       const other = keepNew ? prev : s
       kept.warnings.push(`같은 학번 파일이 더 있어 늦게 저장한 「${kept.file}」을 썼어요(뺀 파일: ${other.file}).`)
@@ -68,5 +98,5 @@ export function collect(d: Derived, tripId: string, files: { name: string; text:
     } else byNo.set(s.no, s)
   }
   const students = [...byNo.values()].sort((a, b) => a.no.localeCompare(b.no))
-  return { students, skipped, questions }
+  return { students, skipped, questions, missionItems, survey: d.doc.survey }
 }

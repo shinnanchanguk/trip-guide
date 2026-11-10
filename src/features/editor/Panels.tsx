@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Icon } from '../../components/Icon'
-import { NIGHTS_MAX, newId, type Announcement, type TripDoc } from '../../trip/schema'
+import { NIGHTS_MAX, newId, type Announcement, type Survey, type SurveyGroup, type TripDoc } from '../../trip/schema'
+import { DEFAULT_COMMENT } from '../../lib/records'
 import { addDays, dateLabel, ZONES } from '../../lib/time'
 
 const nightsLabel = (n: number) => (n === 0 ? '당일' : `${n}박 ${n + 1}일`)
@@ -104,6 +105,83 @@ export function NotesPanel({ kind, doc, onChange }: { kind: 'before' | 'after'; 
           onChange={(e) => onChange({ before: { ...doc.before, checklist: e.target.value.split('\n').map((l) => l.slice(0, 120)).slice(0, 60) } })}
         />
       </label>
+    </div>
+  )
+}
+
+const starterGroup = (title: string, questions: string[]): SurveyGroup => ({ id: newId(), title, questions: questions.map((text) => ({ id: newId(), text })), comment: {} })
+
+/** 만족도 조사: 문항은 1~5점, 묶음마다 자유 의견을 받을지 고른다 */
+export function SurveyPanel({ doc, onChange }: { doc: TripDoc; onChange: (s: Survey | undefined) => void }) {
+  const survey = doc.survey
+  if (!survey)
+    return (
+      <div className="panel form">
+        <h2 className="panel__title">만족도 조사</h2>
+        <p className="field__hint">넣으면 학생 화면의 「다녀와서」 장에 조사가 보여요. 여행 마지막 일정이 지나면 아직 안 마친 학생에게 안내 창이 떠요. 답은 학생이 내는 파일에 함께 담겨 「느낀 점 모으기」에서 문항별 평균과 학생별 응답으로 받아요.</p>
+        <button
+          type="button"
+          className="btn btn--primary btn--block"
+          onClick={() =>
+            onChange({
+              groups: [starterGroup('프로그램', ['활동 내용이 알찼어요', '일정과 이동 시간이 알맞았어요']), starterGroup('숙소와 식사', ['숙소가 깨끗하고 편했어요', '식사가 만족스러웠어요']), starterGroup('안내와 안전', ['안내가 이해하기 쉬웠어요', '안전하게 다녀왔다고 느꼈어요'])],
+            })
+          }
+        >
+          <Icon name="plus" size="1.1rem" /> 기본 문항으로 시작하기
+        </button>
+      </div>
+    )
+  const setGroups = (groups: SurveyGroup[]) => onChange({ ...survey, groups })
+  const patch = (id: string, p: Partial<SurveyGroup>) => setGroups(survey.groups.map((g) => (g.id === id ? { ...g, ...p } : g)))
+  return (
+    <div className="panel form">
+      <h2 className="panel__title">만족도 조사</h2>
+      <label className="field">
+        <span className="field__label">
+          안내 글 <span className="field__opt">넣지 않아도 돼요</span>
+        </span>
+        <textarea className="input input--area" rows={2} maxLength={400} placeholder="예: 다음 체험학습을 준비하는 데 쓰여요. 솔직하게 답해 주세요." value={survey.intro ?? ''} onChange={(e) => onChange({ ...survey, intro: e.target.value || undefined })} />
+      </label>
+      <p className="field__hint">문항은 학생이 1점(전혀 아니에요)부터 5점(매우 그래요)까지 골라요. 빈 칸으로 둔 문항은 저장할 때 빠져요.</p>
+      {survey.groups.map((g) => (
+        <section key={g.id} className="surveyf">
+          <div className="surveyf__head">
+            <label className="field surveyf__title">
+              <span className="field__label">묶음 제목</span>
+              <input className="input" maxLength={40} placeholder="예: 숙소" value={g.title} onChange={(e) => patch(g.id, { title: e.target.value })} />
+            </label>
+            <button type="button" className="icon-btn icon-btn--sm" aria-label={`묶음 「${g.title || '제목 없음'}」 지우기`} onClick={() => window.confirm('이 묶음을 지울까요? 학생이 이미 답했다면 그 답은 모을 때 빠져요.') && setGroups(survey.groups.filter((x) => x.id !== g.id))}>
+              <Icon name="trash" size="1.05rem" />
+            </button>
+          </div>
+          {g.questions.map((q, i) => (
+            <div key={q.id} className="surveyf__q">
+              <input className="input" maxLength={200} placeholder={`문항 ${i + 1}`} aria-label={`${g.title || '묶음'} 문항 ${i + 1}`} value={q.text} onChange={(e) => patch(g.id, { questions: g.questions.map((x) => (x.id === q.id ? { ...x, text: e.target.value } : x)) })} />
+              <button type="button" className="icon-btn icon-btn--sm" aria-label={`문항 ${i + 1} 지우기`} onClick={() => patch(g.id, { questions: g.questions.filter((x) => x.id !== q.id) })}>
+                <Icon name="trash" size="1.05rem" />
+              </button>
+            </div>
+          ))}
+          <button type="button" className="btn btn--ghost btn--sm" disabled={g.questions.length >= 20} onClick={() => patch(g.id, { questions: [...g.questions, { id: newId(), text: '' }] })}>
+            <Icon name="plus" size="1rem" /> 문항 더하기
+          </button>
+          <label className="agree">
+            <input type="checkbox" checked={!!g.comment} onChange={(e) => patch(g.id, { comment: e.target.checked ? {} : undefined })} />
+            <span className="check__box" aria-hidden="true">
+              <Icon name="check" size="0.9rem" strokeWidth={2.4} />
+            </span>
+            <span>이 묶음에 자유 의견 칸 넣기</span>
+          </label>
+          {g.comment ? <input className="input" maxLength={200} placeholder={DEFAULT_COMMENT} aria-label={`${g.title || '묶음'} 자유 의견 안내`} value={g.comment.prompt ?? ''} onChange={(e) => patch(g.id, { comment: { prompt: e.target.value || undefined } })} /> : null}
+        </section>
+      ))}
+      <button type="button" className="btn btn--ghost btn--block" disabled={survey.groups.length >= 12} onClick={() => setGroups([...survey.groups, { id: newId(), title: '', questions: [{ id: newId(), text: '' }] }])}>
+        <Icon name="plus" size="1rem" /> 묶음 더하기
+      </button>
+      <button type="button" className="link-btn" onClick={() => window.confirm('만족도 조사를 통째로 뺄까요?') && onChange(undefined)}>
+        <Icon name="trash" size="1rem" /> 만족도 조사 빼기
+      </button>
     </div>
   )
 }

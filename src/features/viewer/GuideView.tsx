@@ -1,16 +1,18 @@
 import { useRef, useState } from 'react'
 import { rich } from '../../components/Rich'
 import { Icon } from '../../components/Icon'
-import { reflectStops, type GuidePage } from '../../trip/derive'
+import { missionStops, reflectStops, type GuidePage } from '../../trip/derive'
 import { useTrip } from '../../trip/context'
 import { goTo, navigate } from '../../lib/router'
 import { clock, daysUntil, dateLabel } from '../../lib/time'
 import { useStored } from '../../lib/storage'
 import { useBook, useMe } from '../../lib/reflections'
+import { COMMENT_MAX, isSurveyComplete, MISSION_MAX, surveyQuestions, useMissions, useSurveyState, validScore } from '../../lib/records'
 import { buildFileData, buildReflectionText, parseReflectionFile, reflectionFilename } from '../../lib/reflectionFile'
 import { giveFile } from '../../lib/download'
 import { Body, Section } from './parts'
 import { IdentityForm } from './Identity'
+import { SurveyForm } from './SurveyForm'
 
 export function GuideView({ page }: { page: GuidePage }) {
   if (page.kind === 'cover') return <Cover />
@@ -165,6 +167,8 @@ function After() {
           <Body text={doc.after.notes} />
         </Section>
       ) : null}
+      {role === 'student' ? <SurveyForm /> : null}
+      {role === 'teacher' && surveyQuestions(doc).length ? <p className="fineprint reflect-note">학생에게 만족도 조사 {surveyQuestions(doc).length}문항이 이 장에 보여요. 답은 학생이 낸 파일에 함께 담겨요.</p> : null}
       {role === 'student' ? <MyReflections /> : null}
       {role === 'teacher' && tripId && !sample ? (
         <Section title="느낀 점 모으기" icon="upload">
@@ -183,13 +187,21 @@ function MyReflections() {
   const { d, scope, tripId, doc } = useTrip()
   const [me] = useMe(scope)
   const [book, , setBook] = useBook(scope)
+  const [missionBook, , setMissionBook] = useMissions(scope)
+  const [survey, setSurvey] = useSurveyState(scope)
   const [msg, setMsg] = useState<string | null>(null)
   const [lastSaved, setLastSaved] = useStored<string | null>(`file-saved:${scope}`, null)
   const fileRef = useRef<HTMLInputElement>(null)
   const qs = reflectStops(d)
   const written = qs.filter((p) => book[p.stop.id]?.text.trim()).length
 
-  if (!qs.length) return <p className="fineprint">이 여행은 느낀 점을 받지 않아요.</p>
+  const missions = missionStops(d).flatMap((p) => p.stop.missions ?? [])
+  const missionDone = missions.filter((m) => missionBook[m.id]?.text.trim()).length
+  const surveyQs = surveyQuestions(doc)
+  const surveyStarted = surveyQs.some((q) => validScore(survey.scores[q.id])) || Object.values(survey.comments).some((c) => c.trim())
+  const anything = written > 0 || missionDone > 0 || surveyStarted
+
+  if (!qs.length && !missions.length && !doc.survey) return <p className="fineprint">이 여행은 느낀 점을 받지 않아요.</p>
 
   return (
     <Section title="내 느낀 점 내기" icon="pen">
@@ -200,9 +212,22 @@ function MyReflections() {
         </>
       ) : (
         <div className="mine" data-noswipe>
-          <p className="mine__count">
-            <span className="mono">{written}</span> / <span className="mono">{qs.length}</span>곳 썼어요
-          </p>
+          {qs.length ? (
+            <p className="mine__count">
+              <span className="mono">{written}</span> / <span className="mono">{qs.length}</span>곳 썼어요
+            </p>
+          ) : null}
+          {missions.length || surveyQs.length ? (
+            <p className="body-text">
+              {missions.length ? (
+                <>
+                  활동지 <span className="mono">{missionDone}</span> / <span className="mono">{missions.length}</span>개
+                </>
+              ) : null}
+              {missions.length && surveyQs.length ? ' · ' : ''}
+              {surveyQs.length ? (isSurveyComplete(doc, survey) ? '만족도 조사 마침' : '만족도 조사 아직 안 마침') : ''}
+            </p>
+          ) : null}
           <ol className="mine__list">
             {qs.map((p) => (
               <li key={p.key}>
@@ -220,9 +245,9 @@ function MyReflections() {
           <button
             type="button"
             className="btn btn--primary btn--block"
-            disabled={!written}
+            disabled={!anything}
             onClick={async () => {
-              const data = buildFileData(d, tripId ?? 'sample', me, book)
+              const data = buildFileData(d, tripId ?? 'sample', me, book, undefined, { missions: missionBook, survey })
               const text = buildReflectionText(d, data)
               const r = await giveFile(new Blob(['﻿' + text], { type: 'text/plain;charset=utf-8' }), reflectionFilename(data))
               if (r !== 'cancelled') {
@@ -272,7 +297,36 @@ function MyReflections() {
                 }
               }
               setBook(next)
-              setMsg(n ? `${n}곳의 느낀 점을 불러왔어요. 이 휴대폰에 이미 쓴 곳은 그대로 두었어요.` : '새로 불러올 느낀 점이 없어요.')
+              // 활동지·만족도 답도 같은 규칙으로: 이미 쓴 칸은 건드리지 않는다
+              const nextMissions = { ...missionBook }
+              let extra = 0
+              for (const m of r.data.missions ?? []) {
+                if (missions.some((x) => x.id === m.id) && !nextMissions[m.id]?.text.trim()) {
+                  nextMissions[m.id] = { text: m.a.slice(0, MISSION_MAX), updatedAt: m.u || new Date().toISOString() }
+                  extra++
+                }
+              }
+              setMissionBook(nextMissions)
+              if (r.data.survey) {
+                const merged = { ...survey, scores: { ...survey.scores }, comments: { ...survey.comments } }
+                for (const q of surveyQs) {
+                  const v = r.data.survey.scores[q.id]
+                  if (validScore(v) && !validScore(merged.scores[q.id])) {
+                    merged.scores[q.id] = v
+                    extra++
+                  }
+                }
+                for (const g of doc.survey?.groups ?? []) {
+                  const c = r.data.survey.comments[g.id]
+                  if (g.comment && c?.trim() && !merged.comments[g.id]?.trim()) {
+                    merged.comments[g.id] = c.slice(0, COMMENT_MAX)
+                    extra++
+                  }
+                }
+                if (r.data.survey.done && !merged.submittedAt) merged.submittedAt = new Date().toISOString()
+                setSurvey(merged)
+              }
+              setMsg(n || extra ? `${n ? `${n}곳의 느낀 점` : '답'}을 불러왔어요. 이 휴대폰에 이미 쓴 곳은 그대로 두었어요.` : '새로 불러올 글이 없어요.')
             }}
           />
         </div>

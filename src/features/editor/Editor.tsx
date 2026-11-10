@@ -16,11 +16,11 @@ import { UnlockForm } from './UnlockForm'
 import { StopForm } from './StopForm'
 import { ShareSheet } from './ShareSheet'
 import { SettingsSheet } from './SettingsSheet'
-import { InfoPanel, NotesPanel, NoticesPanel } from './Panels'
+import { InfoPanel, NotesPanel, NoticesPanel, SurveyPanel } from './Panels'
 import { normalizeDoc } from './normalize'
 import type { LngLat } from '../../lib/geo'
 
-type Tab = { kind: 'info' } | { kind: 'before' } | { kind: 'after' } | { kind: 'notices' } | { kind: 'day'; i: number }
+type Tab = { kind: 'info' } | { kind: 'before' } | { kind: 'after' } | { kind: 'survey' } | { kind: 'notices' } | { kind: 'day'; i: number }
 type Draft = { doc: TripDocT; baseEtag: string; at: string }
 
 const tabKey = (t: Tab) => (t.kind === 'day' ? `day-${t.i}` : t.kind)
@@ -255,6 +255,7 @@ export default function Editor({ id }: { id: string }) {
     { t: { kind: 'before' }, label: '출발 전' },
     ...draft.days.map((dd, i) => ({ t: { kind: 'day', i } as Tab, label: `${i + 1}일차`, sub: `${dateLabel(addDays(draft.startDate, i))} · ${dd.stops.length}개` })),
     { t: { kind: 'after' }, label: '다녀와서' },
+    { t: { kind: 'survey' }, label: '만족도 조사', sub: draft.survey?.groups.length ? `${draft.survey.groups.reduce((n, g) => n + g.questions.length, 0)}문항` : undefined },
     { t: { kind: 'notices' }, label: '공지', sub: draft.announcements.length ? `${draft.announcements.length}개` : undefined },
   ]
 
@@ -313,6 +314,7 @@ export default function Editor({ id }: { id: string }) {
           {tab.kind === 'info' ? <InfoPanel doc={draft} onChange={(patch) => update((doc) => ({ ...doc, ...patch }))} onNights={setNights} /> : null}
           {tab.kind === 'before' ? <NotesPanel kind="before" doc={draft} onChange={(patch) => update((doc) => ({ ...doc, ...patch }))} /> : null}
           {tab.kind === 'after' ? <NotesPanel kind="after" doc={draft} onChange={(patch) => update((doc) => ({ ...doc, ...patch }))} /> : null}
+          {tab.kind === 'survey' ? <SurveyPanel doc={draft} onChange={(survey) => update((doc) => ({ ...doc, survey }))} /> : null}
           {tab.kind === 'notices' ? <NoticesPanel doc={draft} onChange={(announcements) => update((doc) => ({ ...doc, announcements }))} /> : null}
           {day ? (
             <div className="dayed">
@@ -490,6 +492,8 @@ const FIELD: Record<string, string> = {
   prompt: '느낀 점 질문',
 }
 
+const SURVEY_FIELD: Record<string, string> = { title: '묶음 제목', text: '문항', prompt: '자유 의견 안내', intro: '안내 글' }
+
 /** 저장 검사에 걸린 칸을 선생님이 찾아갈 수 있는 말로(어느 날 어느 일정의 어느 칸) */
 function describeIssue(doc: TripDocT, path: PropertyKey[], code: string): string {
   const ask = (field: string) => (code === 'too_big' ? `「${field}」 칸이 너무 길어요. 줄여 주세요.` : code === 'too_small' ? `「${field}」 칸을 채워 주세요.` : `「${field}」 칸을 확인해 주세요.`)
@@ -500,8 +504,12 @@ function describeIssue(doc: TripDocT, path: PropertyKey[], code: string): string
     const ORD = ['첫', '두', '세', '네', '다섯', '여섯', '일곱', '여덟', '아홉', '열']
     const which = s?.title.trim() ? `「${s.title.trim()}」 일정` : `${ORD[d] ? `${ORD[d]} 번째` : `${d + 1}번째`} 일정`
     const last = [...rest].reverse().find((k) => typeof k === 'string') as string | undefined
-    const field = rest[0] === 'meet' ? (last === 'time' ? '모이는 시각' : '다시 모이는 곳') : rest[0] === 'rules' ? '꼭 지킬 것' : FIELD[last ?? ''] ?? '일정'
+    const field = rest[0] === 'meet' ? (last === 'time' ? '모이는 시각' : '다시 모이는 곳') : rest[0] === 'rules' ? '꼭 지킬 것' : rest[0] === 'missions' ? (last === 'prompt' ? '미션 설명' : '미션 제목') : rest[0] === 'teacherTasks' ? '선생님 할 일' : FIELD[last ?? ''] ?? '일정'
     return `${b + 1}일차 ${which}의 ${ask(field)}`
+  }
+  if (a === 'survey') {
+    const last = [...path].reverse().find((k) => typeof k === 'string') as string | undefined
+    return `만족도 조사의 ${ask(SURVEY_FIELD[last ?? ''] ?? '문항')}`
   }
   if (a === 'title') return ask('여행 제목')
   if (a === 'startDate') return ask('출발일')

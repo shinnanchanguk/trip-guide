@@ -4,7 +4,7 @@ import { navigate } from '../../lib/router'
 import { useTripDoc, LoadScreen } from '../../app/TripLoader'
 import { derive, DEFAULT_PROMPT, reflectStops } from '../../trip/derive'
 import { collect } from '../../lib/collect'
-import { salpeemWorkbook } from '../../lib/salpeem'
+import { salpeemWorkbook, summarizeSurvey } from '../../lib/salpeem'
 import { giveFile, safeName } from '../../lib/download'
 import { TopBar } from '../editor/TopBar'
 import type { TripDoc } from '../../trip/schema'
@@ -25,7 +25,10 @@ function CollectBody({ id, doc }: { id: string; doc: TripDoc }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const result = useMemo(() => collect(d, id, files), [d, id, files])
   const questions = reflectStops(d)
-  const writtenRows = result.students.filter((s) => s.answers.size)
+  const writtenRows = result.students.filter((s) => s.answers.size || s.missions.size || s.survey?.scores.size || s.survey?.comments.size)
+  const hasMissions = result.missionItems.length > 0
+  const hasSurvey = !!doc.survey?.groups.length
+  const summary = useMemo(() => (hasSurvey ? summarizeSurvey(result) : []), [hasSurvey, result])
 
   const add = async (list: FileList | File[]) => {
     const picked: In[] = []
@@ -112,6 +115,8 @@ function CollectBody({ id, doc }: { id: string; doc: TripDoc }) {
                       <th scope="col">학번</th>
                       <th scope="col">이름</th>
                       <th scope="col">쓴 곳</th>
+                      {hasMissions ? <th scope="col">활동지</th> : null}
+                      {hasSurvey ? <th scope="col">만족도</th> : null}
                       <th scope="col">확인할 것</th>
                     </tr>
                   </thead>
@@ -123,18 +128,38 @@ function CollectBody({ id, doc }: { id: string; doc: TripDoc }) {
                         <td className="mono">
                           {s.answers.size}/{questions.length}
                         </td>
+                        {hasMissions ? (
+                          <td className="mono">
+                            {s.missions.size}/{result.missionItems.length}
+                          </td>
+                        ) : null}
+                        {hasSurvey ? <td>{s.survey?.done ? '마침' : s.survey?.scores.size ? '일부' : '안 함'}</td> : null}
                         <td className="ctable__warn">{s.warnings.length ? s.warnings.join(' ') : ''}</td>
                       </tr>
                     ))}
                     {result.skipped.map((s) => (
                       <tr key={s.file} data-skip>
-                        <td colSpan={3}>{s.file}</td>
+                        <td colSpan={3 + (hasMissions ? 1 : 0) + (hasSurvey ? 1 : 0)}>{s.file}</td>
                         <td className="ctable__warn">뺐어요: {s.reason}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              {summary.some((q) => q.n) ? (
+                <details className="collect__qs">
+                  <summary>
+                    <Icon name="chevronDown" size="1rem" /> 만족도 문항별 평균 보기
+                  </summary>
+                  <ol>
+                    {summary.map((q) => (
+                      <li key={q.id}>
+                        {q.group} · {q.text} · <span className="mono">{q.avg ?? '-'}</span>점 (<span className="mono">{q.n}</span>명)
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              ) : null}
               <button type="button" className="btn btn--primary btn--block btn--lg" disabled={!writtenRows.length} onClick={() => void download()}>
                 <Icon name="download" size="1.15rem" /> 살핌 양식 엑셀 받기
               </button>
@@ -148,7 +173,11 @@ function CollectBody({ id, doc }: { id: string; doc: TripDoc }) {
               <li>살핌 「설문」에서 저장 폴더(예: 진로활동)를 고르고 「새 설문 추가」로 받은 엑셀을 올려요.</li>
               <li>학생마다 생기부 문장 초안이 만들어져요. 확인하고 고친 뒤 보내요.</li>
             </ol>
-            <p className="fineprint">엑셀 첫 시트 「설문응답」은 살핌 양식(학번·이름·장소별 질문)이고, 둘째 시트 「모아 보기」는 학생·장소마다 한 줄씩 읽기 좋게 모은 것이에요.</p>
+            <p className="fineprint">
+              엑셀 첫 시트 「설문응답」은 살핌 양식(학번·이름·장소별 질문)이고, 둘째 시트 「모아 보기」는 학생·장소마다 한 줄씩 읽기 좋게 모은 것이에요.
+              {hasMissions ? ' 「활동지」 시트에는 학생별 미션 답이 있어요.' : ''}
+              {hasSurvey ? ' 「만족도 요약」 시트에는 문항별 평균과 응답 수, 「만족도 응답」 시트에는 학생별 응답이 있어요.' : ''} 살핌은 첫 시트만 읽어요.
+            </p>
             {questions.length ? (
               <details className="collect__qs">
                 <summary>

@@ -11,7 +11,7 @@ const ROLES: { id: Role; label: string; sub: string; icon: IconName }[] = [
 ]
 
 /** 누가 보는지 고르기 + 바로 가기 */
-export function MenuSheet({ onJump, onClose }: { onJump: (key: string) => void; onClose: () => void }) {
+export function MenuSheet({ onJump, onOpen, onClose }: { onJump: (key: string) => void; onOpen: (sheet: 'mine' | 'print') => void; onClose: () => void }) {
   const { role, setRole, d, tripId, sample } = useTrip()
   const hasReflect = reflectStops(d).length > 0
   const quick: { key: string; label: string; icon: IconName; show: boolean }[] = [
@@ -62,13 +62,25 @@ export function MenuSheet({ onJump, onClose }: { onJump: (key: string) => void; 
                     </button>
                   </li>
                 ))}
+              {role === 'student' ? (
+                <li>
+                  <button type="button" className="quick__btn" onClick={() => onOpen('mine')}>
+                    <Icon name="document" />내 느낀 점 모아 보기
+                  </button>
+                </li>
+              ) : null}
+              <li>
+                <button type="button" className="quick__btn" onClick={() => onOpen('print')}>
+                  <Icon name="print" />일정표 인쇄
+                </button>
+              </li>
             </ul>
             <button type="button" className="btn btn--primary btn--block" onClick={onClose}>
               안내 보기
             </button>
           </>
         ) : null}
-        <p className="fineprint menu__fine">이 안내는 링크만 있으면 누구나 볼 수 있어요. 느낀 점·학번·이름·체크한 것은 이 휴대폰에만 저장되고 서버로 보내지 않아요.</p>
+        <p className="fineprint menu__fine">이 안내는 링크만 있으면 누구나 볼 수 있어요. 느낀 점·활동지·메모·만족도 답·학번·이름·체크한 것은 이 휴대폰에만 저장되고 서버로 보내지 않아요.</p>
         <button type="button" className="link-btn" onClick={() => navigate('/')}>
           <Icon name="home" size="1rem" /> 도름스 체험학습 첫 화면
         </button>

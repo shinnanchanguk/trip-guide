@@ -48,6 +48,19 @@ export const Leg = z.object({
 export const STOP_KINDS = ['activity', 'meal', 'lodging', 'move', 'etc'] as const
 export const StopKind = z.enum(STOP_KINDS)
 
+const docId = z.string().regex(/^[a-z0-9]{6,16}$/)
+
+/** 활동지·미션 하나. id 는 한 번 정하면 바꾸지 않는다(학생 답이 이 id 에 묶인다) */
+export const Mission = z.object({
+  id: docId,
+  title: line(60),
+  /** 무엇을 하면 되는지 한두 문장 */
+  prompt: text(300).optional(),
+})
+
+export const MISSIONS_MAX = 10
+export const TEACHER_TASKS_MAX = 20
+
 const StopFields = z.object({
   id: z.string().regex(/^[a-z0-9]{6,16}$/),
   time: hhmm,
@@ -68,6 +81,10 @@ const StopFields = z.object({
   meet: z.object({ place: text(80).optional(), time: hhmm.optional() }).optional(),
   /** 학생 느낀 점 받기 */
   reflect: z.object({ on: z.boolean(), prompt: text(140).optional() }).optional(),
+  /** 이 일정의 활동지·미션(학생이 골라 답을 적는다) */
+  missions: z.array(Mission).max(MISSIONS_MAX).optional(),
+  /** 선생님 할 일(한 줄에 하나, 역할이 선생님일 때만 화면에 보인다) */
+  teacherTasks: z.array(line(200)).max(TEACHER_TASKS_MAX).optional(),
 })
 
 /** 처음 판의 nextDay(참/거짓)는 dayShift 1 로 읽는다 */
@@ -93,6 +110,20 @@ export const Announcement = z.object({
   updatedAt: z.string().max(40),
 })
 
+/** 만족도 조사. 문항은 5점 척도, 묶음마다 자유 의견 칸을 하나 둘 수 있다 */
+export const SurveyQuestion = z.object({ id: docId, text: line(200) })
+export const SurveyGroup = z.object({
+  id: docId,
+  title: line(40),
+  questions: z.array(SurveyQuestion).max(20),
+  /** 있으면 이 묶음에 자유 의견 칸을 둔다 */
+  comment: z.object({ prompt: text(200).optional() }).optional(),
+})
+export const Survey = z.object({
+  intro: text(400).optional(),
+  groups: z.array(SurveyGroup).max(12),
+})
+
 export const NIGHTS_MAX = 30
 
 export const TripDoc = z
@@ -113,6 +144,7 @@ export const TripDoc = z
     after: z.object({ notes: text(3000) }),
     announcements: z.array(Announcement).max(30),
     days: z.array(Day).min(1).max(NIGHTS_MAX + 1),
+    survey: Survey.optional(),
   })
   .superRefine((doc, ctx) => {
     if (doc.days.length !== doc.nights + 1) ctx.addIssue({ code: 'custom', message: `일차 수(${doc.days.length})가 ${doc.nights}박 ${doc.nights + 1}일과 달라요`, path: ['days'] })
@@ -123,6 +155,22 @@ export const TripDoc = z
         if (ids.has(s.id)) ctx.addIssue({ code: 'custom', message: '일정 id 가 겹쳐요', path: ['days', di, 'stops', si, 'id'] })
         ids.add(s.id)
       })
+    })
+    const missionIds = new Set<string>()
+    doc.days.forEach((d, di) =>
+      d.stops.forEach((s, si) =>
+        s.missions?.forEach((m, mi) => {
+          if (missionIds.has(m.id)) ctx.addIssue({ code: 'custom', message: '미션 id 가 겹쳐요', path: ['days', di, 'stops', si, 'missions', mi, 'id'] })
+          missionIds.add(m.id)
+        }),
+      ),
+    )
+    const surveyIds = new Set<string>()
+    doc.survey?.groups.forEach((g, gi) => {
+      for (const id of [g.id, ...g.questions.map((q) => q.id)]) {
+        if (surveyIds.has(id)) ctx.addIssue({ code: 'custom', message: '만족도 문항 id 가 겹쳐요', path: ['survey', 'groups', gi, 'id'] })
+        surveyIds.add(id)
+      }
     })
   })
 
@@ -135,6 +183,10 @@ export type StopKind = z.infer<typeof StopKind>
 export type Stop = z.infer<typeof Stop>
 export type Day = z.infer<typeof Day>
 export type Announcement = z.infer<typeof Announcement>
+export type Mission = z.infer<typeof Mission>
+export type SurveyQuestion = z.infer<typeof SurveyQuestion>
+export type SurveyGroup = z.infer<typeof SurveyGroup>
+export type Survey = z.infer<typeof Survey>
 export type TripDoc = z.infer<typeof TripDoc>
 
 /** 문서 크기 상한(바이트) */

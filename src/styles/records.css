@@ -1,0 +1,474 @@
+/* 활동지 · 메모 · 만족도 · 내 글 모아 보기 · 일정표 인쇄 */
+
+.missions__count {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.missions__hint {
+  margin-bottom: var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.missions__list {
+  border-top: 1px solid var(--ink);
+  margin-bottom: var(--s-2);
+}
+
+.mission {
+  border-bottom: 1px dashed var(--line-2);
+}
+
+.mission__head {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 18px;
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 0;
+  text-align: left;
+}
+
+/* 제목이 여러 줄이어도 체크 칸과 화살표는 첫 줄에 선다(글줄 24px 기준) */
+.mission__head .mine__mark {
+  margin-top: 2px;
+}
+
+.mission__head > .icon {
+  margin-top: 4px;
+}
+
+.mission__head .mine__mark[data-done] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.mission__title {
+  font-size: 0.9375rem;
+  line-height: 24px;
+  font-weight: 700;
+}
+
+.mission__body {
+  padding: 2px 0 var(--s-3);
+}
+
+.notebox {
+  margin: var(--s-5) 0 0;
+  padding: var(--s-1) var(--s-3) var(--s-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+}
+
+.notebox__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: left;
+}
+
+.notebox__label {
+  flex: none;
+}
+
+.notebox__has {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.notebox__toggle > .icon:last-child {
+  margin-left: auto;
+}
+
+.notebox .reflect__input {
+  min-height: 80px;
+}
+
+.survey {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.survey__intro {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.survey__scale {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.survey__group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.survey__title {
+  width: 100%;
+  padding: 0 0 6px;
+  border-bottom: 1px solid var(--ink);
+  font-size: 0.9375rem;
+  font-weight: 800;
+}
+
+.survey__q {
+  padding: var(--s-3) 0;
+  border-bottom: 1px dashed var(--line-2);
+}
+
+.survey__q[data-missing] .survey__text {
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.survey__text {
+  margin-bottom: var(--s-2);
+  font-size: var(--fs-sm);
+}
+
+.survey__opt {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.survey__comment {
+  padding-top: var(--s-3);
+}
+
+.survey__comment .reflect__input {
+  min-height: 80px;
+}
+
+.scores {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.score {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  border: 1.5px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--sheet);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.score input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.score[data-on] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.score span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.score input:focus-visible + span {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.writings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+}
+
+.writings__h {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--ink);
+  font-size: 0.9375rem;
+  font-weight: 800;
+}
+
+.writing {
+  padding: var(--s-3) 0;
+  border-bottom: 1px dashed var(--line-2);
+}
+
+.writing__place {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  text-align: left;
+}
+
+.writing__time {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.writing__name {
+  font-weight: 700;
+}
+
+.writing__piece {
+  margin-top: var(--s-2);
+}
+
+.writing__kind {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.writing__text {
+  font-size: var(--fs-sm);
+  white-space: pre-wrap;
+}
+
+.printsheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.printsheet__tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.printsheet__paper {
+  padding: var(--s-4);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  background: var(--sheet);
+  overflow-x: auto;
+}
+
+.print-root {
+  display: none;
+}
+
+.printdoc {
+  color: #111;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.printdoc__school {
+  font-size: 0.75rem;
+  color: #4c4640;
+}
+
+.printdoc__title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.printdoc__dates {
+  margin-bottom: 12px;
+  font-size: 0.75rem;
+}
+
+.printdoc__day {
+  margin-bottom: 14px;
+}
+
+.printdoc__h2 {
+  padding-bottom: 3px;
+  border-bottom: 1.5px solid #111;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  break-after: avoid;
+}
+
+.printdoc__table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.printdoc__table th,
+.printdoc__table td {
+  padding: 4px 6px 4px 0;
+  border-bottom: 0.5px solid #b9b2a8;
+  text-align: left;
+  vertical-align: top;
+}
+
+.printdoc__table th {
+  font-size: 0.6875rem;
+  color: #4c4640;
+}
+
+.printdoc__table tr {
+  break-inside: avoid;
+}
+
+.printdoc__table th:nth-child(1) {
+  width: 7.5rem;
+}
+
+.printdoc__time {
+  overflow-wrap: normal;
+}
+
+.printdoc__table th:nth-child(3) {
+  width: 26%;
+}
+
+.printdoc__sub,
+.printdoc__body {
+  display: block;
+  font-size: 0.75rem;
+  color: #4c4640;
+}
+
+.printdoc__body {
+  white-space: pre-wrap;
+}
+
+.printdoc__empty {
+  padding: 6px 0;
+  color: #4c4640;
+}
+
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body::before,
+  body::after {
+    display: none !important;
+  }
+
+  #root {
+    display: none !important;
+  }
+
+  .print-root {
+    display: block;
+  }
+
+  .printdoc {
+    font-size: 10pt;
+  }
+
+  .printdoc__title {
+    font-size: 20pt;
+  }
+
+  .printdoc__h2 {
+    font-size: 12pt;
+  }
+}
+
+/* 편집기: 활동지·만족도 입력 */
+.missionf__row,
+.surveyf__q {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--s-2);
+}
+
+.surveyf__q {
+  align-items: center;
+}
+
+.missionf__row {
+  margin-bottom: var(--s-3);
+}
+
+.missionf__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.surveyf {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s-2);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line-2);
+}
+
+.surveyf > .btn {
+  align-self: flex-start;
+  min-height: 44px;
+}
+
+.missionf > .btn {
+  align-self: flex-start;
+  min-height: 44px;
+}
+
+/* 지우기 단추는 입력칸과 같은 높이로(46px): 가운데 선이 맞고 손가락으로 누르기 쉽다 */
+.missionf__row > .icon-btn--sm,
+.surveyf__q > .icon-btn--sm,
+.surveyf__head > .icon-btn--sm {
+  width: 44px;
+  height: 46px;
+}
+
+.printsheet .agree,
+.surveyf .agree {
+  padding-block: 10px;
+}
+
+.surveyf__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--s-2);
+}

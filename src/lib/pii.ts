@@ -38,9 +38,15 @@ function texts(doc: TripDoc): [string, string][] {
     out.push([`${di + 1}일차 제목`, d.title ?? ''])
     for (const s of d.stops) {
       const where = `${di + 1}일차 ${s.time} 「${s.title}」`
-      out.push([where, [s.title, s.body, s.place?.name, s.place?.address, s.leg?.note, s.meet?.place, s.reflect?.prompt, ...(s.rules ?? [])].filter(Boolean).join('\n')])
+      out.push([where, [s.title, s.body, s.place?.name, s.place?.address, s.leg?.note, s.meet?.place, s.reflect?.prompt, ...(s.rules ?? []), ...(s.missions ?? []).flatMap((m) => [m.title, m.prompt]), ...(s.teacherTasks ?? [])].filter(Boolean).join('\n')])
     }
   })
+  if (doc.survey) {
+    out.push(['만족도 조사 안내', doc.survey.intro ?? ''])
+    for (const g of doc.survey.groups) {
+      out.push([`만족도 조사 묶음 「${g.title}」`, [g.title, g.comment?.prompt, ...g.questions.map((q) => q.text)].filter(Boolean).join('\n')])
+    }
+  }
   return out
 }
 

@@ -4,6 +4,9 @@ import { Icon, KIND_ICON } from '../../components/Icon'
 import { useTrip } from '../../trip/context'
 import { goTo } from '../../lib/router'
 import { ReflectBox } from './ReflectBox'
+import { MissionBox, MissionNote } from './MissionBox'
+import { NoteBox } from './NoteBox'
+import { TeacherTasks } from './TeacherTasks'
 import { Body, LegChip, MeetingPass, Section, ShiftTag, homeText, mapsLink, timeText } from './parts'
 
 export function StopView({ page }: { page: StopPage }) {
@@ -81,6 +84,11 @@ export function StopView({ page }: { page: StopPage }) {
           <Icon name="pen" size="0.95rem" /> 학생 느낀 점 받는 곳 · 질문: {s.reflect.prompt?.trim() || DEFAULT_PROMPT}
         </p>
       ) : null}
+
+      {s.missions?.length && role === 'student' ? <MissionBox key={s.id} page={page} /> : null}
+      {s.missions?.length && role === 'teacher' ? <MissionNote page={page} /> : null}
+      {s.teacherTasks?.length && role === 'teacher' ? <TeacherTasks page={page} /> : null}
+      {role === 'student' || role === 'teacher' ? <NoteBox key={`note-${s.id}`} page={page} /> : null}
 
       {next ? (
         <button type="button" className="next-card" onClick={() => goTo(next.key, { replace: true })}>

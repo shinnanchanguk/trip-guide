@@ -183,6 +183,9 @@ export function legMinutes(p: StopPage): number | null {
 /** 학생이 느낀 점을 쓰는 일정 */
 export const reflectStops = (d: Derived) => d.stopPages.filter((p) => p.stop.reflect?.on)
 
+/** 활동지·미션이 있는 일정 */
+export const missionStops = (d: Derived) => d.stopPages.filter((p) => p.stop.missions?.length)
+
 export const KIND_LABEL: Record<Stop['kind'], string> = {
   activity: '활동',
   meal: '식사',

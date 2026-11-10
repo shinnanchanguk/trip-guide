@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Icon, KIND_ICON, LEG_ICON } from '../../components/Icon'
 import { DEFAULT_PROMPT, KIND_LABEL, LEG_LABEL } from '../../trip/derive'
-import { LEG_MODES, STOP_KINDS, type LegMode, type Stop, type TripDoc } from '../../trip/schema'
+import { LEG_MODES, MISSIONS_MAX, newId, STOP_KINDS, type LegMode, type Mission, type Stop, type TripDoc } from '../../trip/schema'
 import { stopInstant } from '../../trip/order'
 import { addDays, clock, dateLabel, zoneName } from '../../lib/time'
 import type { LngLat } from '../../lib/geo'
@@ -188,6 +188,29 @@ export function StopForm({
         ) : null}
       </div>
 
+      <MissionsField stop={stop} onChange={onChange} />
+
+      <label className="field">
+        <span className="field__label">
+          선생님 할 일 <span className="field__opt">한 줄에 하나, 넣지 않아도 돼요</span>
+        </span>
+        <textarea
+          className="input input--area"
+          rows={3}
+          placeholder={'예: 입장권 나눠 주기\n모이는 곳에서 인원 세기'}
+          value={(stop.teacherTasks ?? []).join('\n')}
+          onChange={(e) => {
+            const tasks = e.target.value.split('\n').map((l) => l.slice(0, 200))
+            set({ teacherTasks: tasks.some((t) => t.trim()) ? tasks : undefined })
+          }}
+          onBlur={() => {
+            const tasks = (stop.teacherTasks ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 20)
+            set({ teacherTasks: tasks.length ? tasks : undefined })
+          }}
+        />
+        <span className="field__hint">화면에서 「선생님」을 고른 사람에게만 보이고, 체크는 그 기기에만 남아요. 링크를 아는 누구나 고를 수 있으니 이름이나 연락처는 적지 마세요.</span>
+      </label>
+
       <div className="stopf__foot">
         {dayCount > 1 ? (
           <label className="stopf__move">
@@ -208,6 +231,35 @@ export function StopForm({
         </button>
       </div>
     </div>
+  )
+}
+
+/** 활동지·미션: 일정마다 여러 개. 학생이 골라 답을 적는다 */
+function MissionsField({ stop, onChange }: { stop: Stop; onChange: (s: Stop) => void }) {
+  const missions = stop.missions ?? []
+  const setMissions = (next: Mission[]) => onChange({ ...stop, missions: next.length ? next : undefined })
+  const patch = (id: string, p: Partial<Mission>) => setMissions(missions.map((m) => (m.id === id ? { ...m, ...p } : m)))
+  return (
+    <fieldset className="field missionf">
+      <legend className="field__label">
+        활동지·미션 <span className="field__opt">넣지 않아도 돼요</span>
+      </legend>
+      <p className="field__hint">학생이 미션을 골라 답을 적어요. 답은 학생이 내는 파일에 함께 담겨 「느낀 점 모으기」 엑셀의 활동지 시트로 모여요.</p>
+      {missions.map((m, i) => (
+        <div key={m.id} className="missionf__row">
+          <div className="missionf__fields">
+            <input className="input" maxLength={60} placeholder={`미션 ${i + 1} 제목. 예: 마음에 드는 유물 찾기`} value={m.title} aria-label={`미션 ${i + 1} 제목`} onChange={(e) => patch(m.id, { title: e.target.value })} />
+            <textarea className="input input--area" rows={2} maxLength={300} placeholder="무엇을 하면 되는지 적어요(넣지 않아도 돼요)" value={m.prompt ?? ''} aria-label={`미션 ${i + 1} 설명`} onChange={(e) => patch(m.id, { prompt: e.target.value || undefined })} />
+          </div>
+          <button type="button" className="icon-btn icon-btn--sm" aria-label={`미션 ${i + 1} 지우기`} onClick={() => window.confirm('이 미션을 지울까요? 학생이 이미 답을 썼다면 그 답은 모을 때 빠져요.') && setMissions(missions.filter((x) => x.id !== m.id))}>
+            <Icon name="trash" size="1.05rem" />
+          </button>
+        </div>
+      ))}
+      <button type="button" className="btn btn--ghost btn--sm" disabled={missions.length >= MISSIONS_MAX} onClick={() => setMissions([...missions, { id: newId(), title: '' }])}>
+        <Icon name="plus" size="1rem" /> 미션 더하기
+      </button>
+    </fieldset>
   )
 }
 
